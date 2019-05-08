@@ -31,7 +31,7 @@ def _get_page(pagerequest):
     time.sleep(2+random.uniform(0, 6))
     _GOOGLEID = hashlib.md5(str(random.random()).encode('utf-8')).hexdigest()[:16]
     _COOKIES = {'GSP': 'ID={0}:CF=4'.format(_GOOGLEID)}
-    resp_url = _SESSION.get(pagerequest, headers=_HEADERS, cookies=_COOKIES)
+    resp_url = requests.get(pagerequest)
     if resp_url.status_code == 200:
         return resp_url.text
     else:
@@ -42,12 +42,28 @@ def _get_soup(pagerequest):
     html = _get_page(pagerequest)
     return BeautifulSoup(html, 'lxml')
 
+def _body_in_image_soup(soup):
+    next_soup = _get_soup(soup.find("a",{"class": 'nextpage'})['href'])
+    
+    
+
 def _search_in_soup(soup):
     """Generator that returns Publication objects from the search page"""
     while True:
         title = soup.find("h1")
-        soup.find('p')
-        for row in soup.findAll("p"):
+        summary = soup.find("meta", {"name": 'description'})['content']
+        body= ""
+        #soup.findAll('p')
+        
+        for domPC in soup.findAll("div", {"class": 'domPC'}):
+            for row in domPC.findAll('p'):
+                if not row.find('a'):
+                    if summary =="":
+                        summary=row.text
+                    body = body +" <br>"+ row.text
+        if soup.find("a",{"class": 'nextpage'}):
+            body = body + _body_in_image_soup(soup)
+        
             if not row.find('a'):
                 print(row)    
             yield Publication(row)
@@ -56,9 +72,11 @@ def _search_in_soup(soup):
             soup = _get_soup(_HOST+next_['href'])
         else:
             break
+        
 
 def search_pubs_query(url):
     """Search by scholar query and return a generator of Publication objects"""
+    url='http://spanish.xinhuanet.com/2015-08/07/c_134489495.htm'
     soup = _get_soup(url)
     return _search_in_soup(soup)
 
