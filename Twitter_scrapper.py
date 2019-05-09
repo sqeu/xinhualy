@@ -31,6 +31,8 @@ Reading the tweets
 """
 import codecs, json
 import pandas as pd
+from tqdm import tqdm            
+
 
 main_path='C:\\Users\\S80240\\Desktop\\Everis\\IA\\scrapping\\Twitter\\'
 tweet_files=[
@@ -41,8 +43,10 @@ tweet_files=[
 'tweets-2019-04-15.json'
 ]
 
-links=[]
+import xinhualy
+
 for tweet_file in tweet_files:
+    links=[]
     with codecs.open(main_path+tweet_file, 'r', 'utf-8') as f:
         tweets = json.load(f, encoding='utf-8')
         
@@ -57,6 +61,20 @@ for tweet_file in tweet_files:
             if 'xhne.ws' in word:
                 index = word.find('http')
                 links.append(word[index:20])
+            
+    for link in links:
+        
+        search_query= xinhualy.search_pubs_url(link)
+        
+        f= open("..//xinhua_"+tweet_file+".txt","a+")#,errors = 'ignore'
+        for q in tqdm(search_query):
+            try:
+                f.write(q.bib['title']+"|"+q.bib['kicker']+"|"+q.bib['date']+"|"+q.bib['link']+"|"+q.bib['summary']+"|"+q.bib['body']+"\n")
+            except: 
+                f_e= open("..//xinhua_"+tweet_file+"_exception.txt","a+")
+                f_e.write(q.bib['title']+"|"+q.bib['kicker']+"|"+q.bib['date']+"|"+q.bib['link']+"\n")
+                f_e.close()
+        f.close()
         
 
      

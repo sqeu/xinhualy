@@ -42,89 +42,74 @@ def _get_soup(pagerequest):
     html = _get_page(pagerequest)
     return BeautifulSoup(html, 'lxml')
 
-def _body_in_image_soup(soup):
-    next_soup = _get_soup(soup.find("a",{"class": 'nextpage'})['href'])
-    
-    
-
 def _search_in_soup(soup):
     """Generator that returns Publication objects from the search page"""
-    while True:
-        title = soup.find("h1")
-        summary = soup.find("meta", {"name": 'description'})['content']
-        body= ""
-        #soup.findAll('p')
+    return Publication(soup)
         
-        for domPC in soup.findAll("div", {"class": 'domPC'}):
-            for row in domPC.findAll('p'):
-                if not row.find('a'):
-                    if summary =="":
-                        summary=row.text
-                    body = body +" <br>"+ row.text
-        if soup.find("a",{"class": 'nextpage'}):
-            body = body + _body_in_image_soup(soup)
-        
-            if not row.find('a'):
-                print(row)    
-            yield Publication(row)
-        next_= soup.find("a", {"class": lambda L: L and L.startswith('btn btn-next page')})
-        if next_:
-            soup = _get_soup(_HOST+next_['href'])
-        else:
-            break
-        
-
-def search_pubs_query(url):
+def search_pubs_url(url):
     """Search by scholar query and return a generator of Publication objects"""
-    url='http://spanish.xinhuanet.com/2015-08/07/c_134489495.htm'
+    #url='http://spanish.xinhuanet.com/2015-08/07/c_134489495.htm'
     soup = _get_soup(url)
     return _search_in_soup(soup)
 
-def _body_in_soup(article_soup):
-    """Generator that returns Publication objects from the search page"""
-    summary=""
-    body=""
-    for resultList in article_soup.findAll("div", {"class" : lambda L: L and L.startswith('mce-body')}):
-        for row in resultList.findAll("p", {"class": 'mce'}):
-            if summary == "":
-                summary = row.text
-            else:  
-                #and not row.find('a').has_attr('target')            
-                if not row.find('a') and not row.has_attr('dir') and not row.has_attr('lang'):
+def _body_in_image_soup(soup,body):
+    next_soup = _get_soup(soup.findAll("a",{"class": 'nextpage'})[-1]['href'])
+    for domPC in next_soup.findAll("div", {"class": 'domPC'}):
+            for row in domPC.findAll('p'):
+                if not row.find('a'):
                     body = body +" <br>"+ row.text
-    return (summary,body)
+    #next_soup.findAll("a",{"class": 'nextpage'})                    
+    if next_soup.find("img",{"src": lambda L: L and L.endswith('xia.gif')}):
+            body = _body_in_image_soup(next_soup,body)
+            
+    return body
+
+def _body_in_soup(soup):
+    """Generator that returns Publication objects from the search page"""
+    
+    summary = soup.find("meta", {"name": 'description'})['content']
+    body= ""
+    #soup.findAll('p')
+    
+    for domPC in soup.findAll("div", {"class": 'domPC'}):
+        for row in domPC.findAll('p'):
+            if not row.find('a'):
+                if summary =="":
+                    summary=row.text
+                body = body +" <br>"+ row.text
+    if soup.find("a",{"class": 'nextpage'}):
+        body = _body_in_image_soup(soup,body)
+    
+    return summary,body
         
+def clean_bad_chars(text):
+    bad_chars=['\r','\n']
+    for bad_char in bad_chars:
+        text=text.replace(bad_char,'')
+    return text
         
 class Publication(object):
     """Returns an object for a single publication"""
     def __init__(self, __data):
         self.bib = dict()
-        self.bib['title'] = __data.find('a').text
-        if __data.find('span'):
-            self.bib['kicker'] = __data.find('span').text
-        else:
-            self.bib['kicker'] = ""
-        if __data.find('small'):
-            self.bib['date'] = __data.find('small')['title']
-        else:
-            self.bib['date'] = ""
-        self.bib['link'] = __data.find('a',href=True)['href']
+        self.bib['title'] = clean_bad_chars(__data.find("h1").text)
         
-        article_soup = _get_soup(_HOST+__data.find('a',href=True)['href'])
-        body=_body_in_soup(article_soup)
+        self.bib['section'] = __data.find("meta",{"name": 'section'})['content']
+        self.bib['date'] = clean_bad_chars(__data.find("meta",{"name": 'pubdate'})['content'])
         
-        self.bib['summary']=body[0]
-        self.bib['body']=body[1]
+        summary,body=_body_in_soup(__data)
+        
+        self.bib['summary']=clean_bad_chars(summary)
+        self.bib['body']=clean_bad_chars(body)
                 
     def __str__(self):
         return pprint.pformat(self.__dict__)
     
     
 #from tqdm import tqdm
-#query='bcp'
-#resultado = search_pubs_query('bcp')
-#q=next(resultado)
-#print(q)
+query='http://spanish.xinhuanet.com/2019-01/16/c_137748149.htm'
+resultado = search_pubs_url(url)
+print(resultado)
 #q.bib['title']
 
 #f= open(query+".txt","x+")
