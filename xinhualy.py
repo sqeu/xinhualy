@@ -93,9 +93,14 @@ class Publication(object):
     def __init__(self, __data):
         self.bib = dict()
         self.bib['title'] = clean_bad_chars(__data.find("h1").text)
-        
-        self.bib['section'] = __data.find("meta",{"name": 'section'})['content']
-        self.bib['date'] = clean_bad_chars(__data.find("meta",{"name": 'pubdate'})['content'])
+        if __data.find("meta",{"name": 'section'}):
+            self.bib['section'] = __data.find("meta",{"name": 'section'})['content']
+        else:
+            self.bib['section']=''
+        if __data.find("meta",{"name": 'pubdate'}):
+            self.bib['date'] = clean_bad_chars(__data.find("meta",{"name": 'pubdate'})['content'])
+        else:
+            self.bib['date']=''
         
         summary,body=_body_in_soup(__data)
         
@@ -106,16 +111,66 @@ class Publication(object):
         return pprint.pformat(self.__dict__)
     
     
-#from tqdm import tqdm
-query='http://spanish.xinhuanet.com/2019-01/16/c_137748149.htm'
-resultado = search_pubs_url(url)
-print(resultado)
-#q.bib['title']
+    
+#############################33
+        
+    
+import codecs, json
+import pandas as pd
+from tqdm import tqdm            
+import requests
 
-#f= open(query+".txt","x+")
-#for q in tqdm(resultado):
-#    try:
-#        f.write(q.bib['title'].replace(' ','_')+"|"+q.bib['link']+"|"+q.bib['author']+"\n")
-#    except ValueError as e:
-#        print(e.__context__)
-#f.close()
+main_path='C:\\Users\\S80240\\Desktop\\Everis\\IA\\scrapping\\Twitter\\'
+tweet_files=[
+'tweets-2015.json',
+'tweets-2016.json',
+'tweets-2017.json',
+'tweets-2018.json',
+'tweets-2019-04-15.json'
+]
+
+def unshorten_url(session, url):
+    #time.sleep(2+random.uniform(0, 6))
+    resp_url=url
+    try:
+        resp = session.head(url, allow_redirects=True)
+        resp_url=resp.url
+    except Exception as e:
+        print(e)
+        print(url)
+    
+    return resp_url
+    
+
+session = requests.Session()
+for tweet_file in tweet_files:
+    links=[]
+    with codecs.open(main_path+tweet_file, 'r', 'utf-8') as f:
+        tweets = json.load(f, encoding='utf-8')
+        
+    list_tweets = [list(elem.values()) for elem in tweets]
+    list_columns = list(tweets[0].keys())
+    tweets_df = pd.DataFrame(list_tweets, columns=list_columns)
+    
+    for index, tweet in tqdm(tweets_df.iterrows()):
+        text = tweet['text'].replace('\n',' ').replace(u'\xa0', u' ')
+        text_list = text.split(' ')
+        for word in text_list:
+            if 'xhne.ws' in word:
+                index = word.find('http')
+                link = unshorten_url(session,word[index:index+20])
+                if link.find('spanish.xinhuanet.com')>0:
+                    links.append(link)
+                    len(links)
+
+    for link in tqdm(links):    
+        q= search_pubs_url(link)
+        
+        f= open("..//xinhua_"+tweet_file+".txt","a+")#,errors = 'ignore'        
+        try:
+            f.write(q.bib['title']+"|"+q.bib['section']+"|"+q.bib['date']+"|"+link+"|"+q.bib['summary']+"|"+q.bib['body']+"\n")
+        except: 
+            f_e= open("..//xinhua_"+tweet_file+"_exception.txt","a+")
+            f_e.write(q.bib['title']+"|"+q.bib['section']+"|"+q.bib['date']+"|"+link+"\n")
+            f_e.close()
+        f.close()         
